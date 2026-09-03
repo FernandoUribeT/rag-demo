@@ -85,7 +85,7 @@ generar la respuesta. Están aisladas como protocolos en `contracts.py`.
 
 Todo lo demás —trocear, indexar, buscar, umbralizar, armar el prompt, decidir
 si abstenerse— es determinista y se prueba sin red, sin claves y sin servidor.
-Por eso las 76 pruebas corren en menos de un segundo y funcionan en CI.
+Por eso las 77 pruebas corren en menos de un segundo y funcionan en CI.
 
 Una suite que necesita un modelo real no corre en CI, y una suite que no corre
 en CI termina no corriendo nunca.
@@ -121,7 +121,7 @@ aquí agregaría dependencias y capas sin quitar trabajo.
 
 ```bash
 uv sync --dev
-uv run pytest                     # 76 pruebas, sin red ni servicios
+uv run pytest                     # 77 pruebas, sin red ni servicios
 ```
 
 Con todas las dependencias, en contenedores:
