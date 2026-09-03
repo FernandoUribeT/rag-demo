@@ -108,3 +108,21 @@ def test_cambiar_de_modelo_invalida_lo_cacheado(modelo_contado, cache):
 def test_expone_las_dimensiones_del_envuelto(modelo_contado, cache):
     con_cache = EmbedderConCache(modelo_contado, cache, "bge-m3")
     assert con_cache.dimensions == modelo_contado.dimensions
+
+
+class EmbedderQueDevuelveNone(EmbedderDeterminista):
+    """Simula un proveedor defectuoso que entrega un hueco en la lista."""
+
+    def embed(self, texts):
+        vectores = super().embed(texts)
+        if vectores:
+            vectores[0] = None  # type: ignore[assignment]
+        return vectores
+
+
+def test_falla_fuerte_si_algun_texto_queda_sin_vector(cache):
+    """Un hueco debe reventar aquí, no más adelante y lejos de su causa."""
+    con_cache = EmbedderConCache(EmbedderQueDevuelveNone(), cache, "bge-m3")
+
+    with pytest.raises(RuntimeError, match="sin vector"):
+        con_cache.embed(["uno", "dos"])

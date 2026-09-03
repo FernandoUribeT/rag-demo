@@ -127,4 +127,15 @@ class EmbedderConCache:
                 for posicion in faltantes[texto]:
                     resultado[posicion] = vector
 
+        # Si alguna posición quedó sin vector, se falla aquí y no más adelante.
+        # Filtrarlas devolvería una lista más corta que la de entrada, y el
+        # error saldría lejos de su causa: al indexar, como "cada fragmento
+        # necesita exactamente un vector", o al consultar, como un IndexError.
+        sin_vector = [i for i, v in enumerate(resultado) if v is None]
+        if sin_vector:
+            raise RuntimeError(
+                f"quedaron {len(sin_vector)} textos sin vector en las posiciones "
+                f"{sin_vector[:5]}"
+            )
+
         return [v for v in resultado if v is not None]
