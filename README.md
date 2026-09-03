@@ -1,5 +1,7 @@
 # rag-demo
 
+[![tests](https://github.com/FernandoUribeT/rag-demo/actions/workflows/tests.yml/badge.svg)](https://github.com/FernandoUribeT/rag-demo/actions/workflows/tests.yml)
+
 Un usuario hace una pregunta, el sistema busca en documentos internos, y un
 modelo redacta la respuesta citando de dónde la sacó.
 
