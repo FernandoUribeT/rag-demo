@@ -12,6 +12,20 @@ distinguir una respuesta buena de una inventada.
 
 ## Cómo funciona
 
+Ingesta de un documento:
+
+```
+subir ──► MinIO (guarda el archivo) ──► RabbitMQ (encola el indexado)
+                                              │
+                                           worker
+                                              │
+                              trocear ──► vectorizar ──► índice
+                                              │
+                                        Redis (caché)
+```
+
+Consulta:
+
 ```
 pregunta ──► vector ──► búsqueda por similitud ──► ¿supera el umbral?
                                                       │
@@ -29,8 +43,38 @@ pregunta ──► vector ──► búsqueda por similitud ──► ¿supera e
 | `chunking.py` | parte documentos en fragmentos recuperables sin cortar párrafos |
 | `store.py` | índice vectorial en memoria, similitud coseno, umbral |
 | `pipeline.py` | recuperación, armado del prompt y regla de abstención |
-| `contracts.py` | los dos protocolos que dependen de un modelo |
-| `providers.py` | implementación contra Ollama |
+| `cache.py` | caché de vectores; decorador sobre cualquier `Embedder` |
+| `ingesta.py` | aceptar documento, encolar, procesar en el worker |
+| `storage.py` | almacén de objetos para el documento original |
+| `contracts.py` | los protocolos que dependen de un modelo |
+| `providers.py`, `cola_rabbitmq.py` | adaptadores: Ollama, RabbitMQ |
+
+## Por qué ingesta asíncrona
+
+Trocear y vectorizar un documento largo tarda. Hacerlo dentro de la petición
+deja al usuario esperando y, si el proceso muere a la mitad, el documento queda
+indexado por partes sin que nadie se entere.
+
+`aceptar()` guarda el archivo y encola el trabajo: responde de inmediato.
+`procesar()` lo ejecuta un worker aparte. La carga es rápida, el trabajo pesado
+es reintentable, y se escala el indexado agregando workers sin tocar la API.
+
+El mensaje lleva la **clave** del objeto, nunca el documento. Un documento
+dentro de la cola la convierte en un almacén improvisado, con sus límites de
+tamaño y sin forma de releerlo después.
+
+El procesamiento es idempotente porque la clave incluye el hash del contenido.
+Eso importa: una cola garantiza *al menos una* entrega, no exactamente una.
+
+## Por qué cachear los vectores
+
+Vectorizar es la operación cara: cada llamada cruza la red hacia el modelo. Y
+se repite más de lo que parece — al reindexar, la mayoría de los fragmentos no
+cambió, y la misma pregunta llega varias veces.
+
+La clave de caché incluye el nombre del modelo. Omitirlo es el error clásico
+que, tras cambiar de modelo, sigue devolviendo vectores del anterior —
+incomparables con los nuevos, y sin ningún síntoma visible.
 
 ## Por qué está separado así
 
@@ -39,7 +83,7 @@ generar la respuesta. Están aisladas como protocolos en `contracts.py`.
 
 Todo lo demás —trocear, indexar, buscar, umbralizar, armar el prompt, decidir
 si abstenerse— es determinista y se prueba sin red, sin claves y sin servidor.
-Por eso las 35 pruebas corren en menos de un segundo y funcionan en CI.
+Por eso las 67 pruebas corren en menos de un segundo y funcionan en CI.
 
 Una suite que necesita un modelo real no corre en CI, y una suite que no corre
 en CI termina no corriendo nunca.
@@ -75,8 +119,18 @@ aquí agregaría dependencias y capas sin quitar trabajo.
 
 ```bash
 uv sync --dev
-uv run pytest                     # 35 pruebas, sin red
+uv run pytest                     # 67 pruebas, sin red ni servicios
 ```
+
+Con todas las dependencias, en contenedores:
+
+```bash
+docker compose up -d              # Redis, RabbitMQ, MinIO y la app
+docker compose run --rm app rag-demo "¿cuándo se requiere Carta Porte?"
+```
+
+Las consolas web quedan en `localhost:15672` (RabbitMQ) y `localhost:9001`
+(MinIO), útiles para ver la cola y los objetos mientras se depura.
 
 Para usarlo de verdad hace falta Ollama en local:
 
@@ -102,4 +156,4 @@ propio y no reproduce material de nadie.
 
 ## Requisitos
 
-Python 3.13, [uv](https://docs.astral.sh/uv/), y Ollama solo para el modo real.
+Python 3.13 y [uv](https://docs.astral.sh/uv/). Ollama solo para el modo real; Docker solo si se quieren levantar Redis, RabbitMQ y MinIO.

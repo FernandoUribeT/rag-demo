@@ -8,6 +8,15 @@ dependencies = [
     "numpy>=2.5.2",
 ]
 
+[project.optional-dependencies]
+# Adaptadores de servicios externos. Opcionales a proposito: el nucleo
+# y toda su suite de pruebas funcionan sin ellos.
+servicios = [
+    "redis>=5.0",
+    "pika>=1.3",
+    "minio>=7.2",
+]
+
 [project.scripts]
 rag-demo = "rag_demo.cli:main"
 

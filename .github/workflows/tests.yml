@@ -50,3 +50,28 @@ jobs:
         with:
           name: reporte-pruebas-py${{ matrix.python-version }}
           path: reporte-pruebas.xml
+
+  # Construir la imagen es una prueba en si misma: verifica que el Dockerfile
+  # sigue siendo valido y que el proyecto se instala desde cero en un entorno
+  # limpio, sin nada heredado de la maquina de quien lo escribio.
+  imagen:
+    name: Construir imagen
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Construir
+        run: docker build -t rag-demo:ci .
+
+      - name: Verificar que arranca
+        run: docker run --rm rag-demo:ci rag-demo --help
+
+      # El contenedor no debe correr como root: si alguien logra ejecutar algo
+      # dentro, que no lo haga con privilegios.
+      - name: Verificar que no corre como root
+        run: |
+          uid=$(docker run --rm rag-demo:ci id -u)
+          test "$uid" != "0" || { echo "el contenedor corre como root"; exit 1; }
+          echo "corre como uid $uid"
