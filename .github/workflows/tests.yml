@@ -75,3 +75,38 @@ jobs:
           uid=$(docker run --rm rag-demo:ci id -u)
           test "$uid" != "0" || { echo "el contenedor corre como root"; exit 1; }
           echo "corre como uid $uid"
+
+  # La interfaz se prueba y se construye aparte del backend: son dos artefactos
+  # con dependencias distintas, y separarlos evita que un fallo de Node bloquee
+  # el reporte de las pruebas de Python (y al reves).
+  web:
+    name: Interfaz Angular
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # npm ci y no npm install: instala exactamente lo que fija el lockfile
+      # y falla si no coincide con package.json, en lugar de resolver versiones
+      # distintas a las probadas en local.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Ejecutar pruebas
+        run: npx ng test --watch=false
+
+      # Construir es una prueba en si misma: detecta errores de tipos y de
+      # plantilla que las pruebas unitarias no necesariamente tocan.
+      - name: Construir
+        run: npx ng build

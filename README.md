@@ -47,7 +47,9 @@ pregunta ──► vector ──► búsqueda por similitud ──► ¿supera e
 | `ingesta.py` | aceptar documento, encolar, procesar en el worker |
 | `storage.py` | almacén de objetos para el documento original |
 | `contracts.py` | los protocolos que dependen de un modelo |
+| `api.py` | API HTTP con FastAPI: consultar y subir documentos |
 | `providers.py`, `cola_rabbitmq.py` | adaptadores: Ollama, RabbitMQ |
+| `web/` | interfaz en Angular que consume la API |
 
 ## Por qué ingesta asíncrona
 
@@ -83,7 +85,7 @@ generar la respuesta. Están aisladas como protocolos en `contracts.py`.
 
 Todo lo demás —trocear, indexar, buscar, umbralizar, armar el prompt, decidir
 si abstenerse— es determinista y se prueba sin red, sin claves y sin servidor.
-Por eso las 67 pruebas corren en menos de un segundo y funcionan en CI.
+Por eso las 76 pruebas corren en menos de un segundo y funcionan en CI.
 
 Una suite que necesita un modelo real no corre en CI, y una suite que no corre
 en CI termina no corriendo nunca.
@@ -119,7 +121,7 @@ aquí agregaría dependencias y capas sin quitar trabajo.
 
 ```bash
 uv sync --dev
-uv run pytest                     # 67 pruebas, sin red ni servicios
+uv run pytest                     # 76 pruebas, sin red ni servicios
 ```
 
 Con todas las dependencias, en contenedores:
@@ -146,6 +148,31 @@ uv run rag-demo "¿qué documentos integran un expediente?" --solo-recuperar
 invocar al modelo. Es la forma de depurar la calidad de la búsqueda por
 separado de la calidad de la redacción: cuando la respuesta sale mal, primero
 hay que saber cuál de las dos etapas falló.
+
+## La interfaz
+
+Una aplicación de Angular en `web/`: se escribe la pregunta, se muestra la
+respuesta y debajo las fuentes con su similitud.
+
+Cuando el sistema se abstiene, la interfaz lo dice explícitamente en lugar de
+mostrar el mensaje a secas. Un "no encontré nada" sin explicación se lee como
+si el sistema hubiera fallado; con la nota de que ningún fragmento superó el
+umbral, se entiende que decidió no responder.
+
+Toda la comunicación con el backend vive en `rag.service.ts`, y el detalle
+técnico de un error se queda en la consola: al usuario le llega un mensaje
+legible, no un stack trace del servidor.
+
+```bash
+cd web
+npm ci
+npx ng test --watch=false   # 20 pruebas
+npx ng serve                # http://localhost:4200
+```
+
+Las 20 pruebas corren sin backend: `HttpTestingController` intercepta las
+peticiones en las del servicio, y el componente recibe un doble de `RagService`
+en las suyas.
 
 ## El corpus
 

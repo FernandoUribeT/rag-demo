@@ -1,0 +1,46 @@
+<main>
+  <h1>Consulta sobre documentos internos</h1>
+
+  <form (ngSubmit)="consultar()">
+    <label for="pregunta">Pregunta</label>
+    <input
+      id="pregunta"
+      name="pregunta"
+      type="text"
+      autocomplete="off"
+      placeholder="¿cuándo se requiere el complemento Carta Porte?"
+      [ngModel]="pregunta()"
+      (ngModelChange)="pregunta.set($event)"
+    />
+    <button type="submit" [disabled]="!puedeConsultar()">
+      {{ consultando() ? 'Consultando…' : 'Consultar' }}
+    </button>
+  </form>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  @if (respuesta(); as r) {
+    <section class="respuesta" [class.abstuvo]="r.abstuvo">
+      <p>{{ r.texto }}</p>
+
+      @if (r.fuentes.length) {
+        <h2>Fuentes</h2>
+        <ul>
+          @for (fuente of r.fuentes; track fuente.id) {
+            <li>
+              <strong>{{ fuente.id }}</strong>
+              <span class="similitud">similitud {{ fuente.similitud }}</span>
+              <p class="extracto">{{ fuente.extracto }}</p>
+            </li>
+          }
+        </ul>
+      } @else {
+        <!-- Sin fuentes el sistema se abstuvo: decirlo explicitamente evita
+             que se lea como si hubiera contestado sin respaldo. -->
+        <p class="nota">No se recuperó ningún fragmento por encima del umbral.</p>
+      }
+    </section>
+  }
+</main>

@@ -4,3 +4,8 @@ __pycache__/
 .pytest_cache/
 dist/
 reporte-pruebas.xml
+
+# Angular
+web/node_modules/
+web/dist/
+web/.angular/
