@@ -1,0 +1,52 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Se prueba el piso declarado en pyproject.toml y una version reciente.
+    # fail-fast off: si una version falla, la otra igual reporta, para ver el
+    # panorama completo en una sola corrida.
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.14"]
+
+    name: pytest (Python ${{ matrix.python-version }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Instalar Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      # --frozen obliga a respetar uv.lock en lugar de resolver versiones
+      # distintas a las probadas en local.
+      - name: Instalar dependencias
+        run: uv sync --frozen --dev
+
+      # La suite completa corre sin red ni modelo: esa es la razon de que
+      # Embedder y LanguageModel sean protocolos.
+      - name: Ejecutar pruebas
+        run: uv run pytest -v --junitxml=reporte-pruebas.xml
+
+      # if: always() — sin esto el paso se saltaria justo cuando las pruebas
+      # fallaron, que es cuando mas se necesita el reporte.
+      - name: Publicar reporte
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reporte-pruebas-py${{ matrix.python-version }}
+          path: reporte-pruebas.xml
