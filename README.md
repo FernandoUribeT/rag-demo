@@ -204,6 +204,36 @@ Las 20 pruebas corren sin backend: `HttpTestingController` intercepta las
 peticiones en las del servicio, y el componente recibe un doble de `RagService`
 en las suyas.
 
+## Cómo verificarlo de punta a punta
+
+Las 118 pruebas cubren la lógica sin red. Lo que no pueden cubrir es que el
+sistema real, contra Stripe real, se comporte como se espera — y ahí estaba el
+único defecto que llegó a producirse: la librería de Stripe devuelve objetos
+que se parecen a un diccionario pero no lo son, y el doble de prueba, construido
+con `json.loads`, era más permisivo que la realidad. Las pruebas seguían en
+verde con el webhook roto.
+
+Por eso existe `verificar.sh`. Con el servidor y `stripe listen` corriendo:
+
+```bash
+./verificar.sh
+```
+
+Comprueba solo lo que puede comprobar solo —salud, saldo inicial, rechazo sin
+créditos, firma inválida, paquete inventado— y para lo que necesita un pago
+real te entrega la URL y el identificador de cliente de esa corrida.
+
+Las dos comprobaciones manuales que importan:
+
+**Después de pagar**, el saldo debe subir. **Reenviando el mismo evento**, el
+saldo NO debe volver a subir: Stripe reintenta hasta recibir 2xx y puede
+repetir un evento por diseño.
+
+Y una tercera que se hace a mano en el navegador: abrir la URL de éxito sin
+haber pagado. El saldo no debe cambiar. Otorgar el producto en esa página es el
+defecto clásico de las integraciones de pago, porque cualquiera puede
+navegar ahí.
+
 ## El corpus
 
 Dos documentos sobre complemento Carta Porte y expedientes digitales de
