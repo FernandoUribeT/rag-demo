@@ -9,3 +9,6 @@ reporte-pruebas.xml
 web/node_modules/
 web/dist/
 web/.angular/
+
+# Claves locales
+.env
