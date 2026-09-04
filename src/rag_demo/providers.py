@@ -11,16 +11,20 @@ métodos. Nada del resto del sistema se entera.
 
 from __future__ import annotations
 
+import os
 from typing import Sequence
 
 import httpx
 
-OLLAMA = "http://127.0.0.1:11434"
+OLLAMA = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 
 # bge-m3 es multilingüe, lo que importa cuando el corpus está en español y la
 # pregunta puede llegar en cualquiera de los dos idiomas.
-MODELO_EMBEDDING = "bge-m3"
-MODELO_LENGUAJE = "llama3.1:8b"
+MODELO_EMBEDDING = os.getenv("MODELO_EMBEDDING", "bge-m3")
+
+# Configurable por entorno: cual modelo hay instalado varia entre maquinas, y
+# clavarlo en el codigo obliga a editar el fuente para probar en otra.
+MODELO_LENGUAJE = os.getenv("MODELO_LENGUAJE", "qwen3:8b")
 
 TIEMPO_LIMITE = 120.0
 

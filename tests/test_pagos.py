@@ -133,3 +133,63 @@ def test_el_precio_no_lo_decide_el_comprador(pasarela):
 def test_no_se_puede_crear_una_sesion_de_un_paquete_inventado(pasarela):
     with pytest.raises(PaqueteDesconocido):
         pasarela.crear_sesion("creditos_gratis", "ana")
+
+
+# ── Regresión: el doble no debe ser más permisivo que Stripe ─────────────────
+
+class ObjetoTipoStripe:
+    """Imita un StripeObject: corchetes y atributos, pero SIN .get().
+
+    Es la diferencia que dejó pasar un fallo real. La pasarela falsa construye
+    los eventos con json.loads, que devuelve diccionarios de verdad, así que
+    .get() funcionaba en las pruebas y reventaba contra Stripe.
+
+    Un doble más permisivo que la realidad da pruebas en verde y produccion en
+    rojo. Esta clase existe para cerrar esa brecha.
+    """
+
+    def __init__(self, datos: dict) -> None:
+        self._datos = datos
+
+    def __getitem__(self, clave):
+        return self._datos[clave]
+
+    def to_dict(self) -> dict:
+        return dict(self._datos)
+
+    def __getattr__(self, nombre):
+        if nombre in ("get", "keys", "items", "values"):
+            raise AttributeError(
+                f"'{nombre}' is a dict method, but a Session is not a dict"
+            )
+        raise AttributeError(nombre)
+
+
+def test_normaliza_un_objeto_de_stripe_a_diccionario():
+    from rag_demo.pagos import _como_dict
+
+    objeto = ObjetoTipoStripe({"payment_status": "paid"})
+    assert _como_dict(objeto) == {"payment_status": "paid"}
+
+
+def test_un_objeto_sin_get_no_revienta_al_normalizarlo():
+    """Reproduce el AttributeError que solo aparecia contra Stripe real."""
+    from rag_demo.pagos import _como_dict
+
+    objeto = ObjetoTipoStripe({"a": 1})
+    with pytest.raises(AttributeError):
+        objeto.get("a")          # confirma que el doble sí carece de .get()
+    assert _como_dict(objeto) == {"a": 1}   # y que aun así se normaliza
+
+
+def test_una_sesion_sin_metadata_se_ignora_en_vez_de_fallar():
+    """Puede venir de otra integración sobre la misma cuenta: ignorar, no
+    reventar, para que Stripe no reintente para siempre."""
+    from rag_demo.pagos import _como_dict
+
+    sesion = _como_dict(
+        ObjetoTipoStripe(
+            {"payment_status": "paid", "client_reference_id": "ana", "metadata": {}}
+        )
+    )
+    assert not _como_dict(sesion.get("metadata") or {}).get("creditos")

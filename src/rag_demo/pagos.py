@@ -70,6 +70,21 @@ class PasarelaDePagos(Protocol):
         ...
 
 
+def _como_dict(valor: object) -> dict:
+    """Normaliza un StripeObject a diccionario plano.
+
+    La librería de Stripe devuelve objetos que se parecen a un dict pero no lo
+    son: soportan corchetes y atributos, pero no .get(). Convertir en la
+    frontera evita que esa diferencia se filtre al resto del código —y evita el
+    AttributeError que solo aparece contra Stripe real, nunca contra un doble
+    construido con json.loads.
+    """
+    convertir = getattr(valor, "to_dict", None)
+    if callable(convertir):
+        return dict(convertir())
+    return dict(valor) if valor else {}
+
+
 def creditos_de(paquete: str) -> int:
     if paquete not in PAQUETES:
         raise PaqueteDesconocido(paquete)
@@ -143,15 +158,27 @@ class PasarelaStripe:
         if evento["type"] != "checkout.session.completed":
             return None
 
-        sesion = evento["data"]["object"]
+        # La librería devuelve StripeObject, no dict: sin esta conversión,
+        # cualquier llamada a .get() revienta con AttributeError. Se normaliza
+        # aquí, en la frontera, para que el resto trabaje con datos planos.
+        sesion = _como_dict(evento["data"]["object"])
 
         # Una sesión completada no siempre está pagada: puede quedar pendiente
         # con métodos asíncronos. Otorgar aquí regalaría créditos sin cobro.
         if sesion.get("payment_status") != "paid":
             return None
 
+        cliente = sesion.get("client_reference_id")
+        creditos = _como_dict(sesion.get("metadata") or {}).get("creditos")
+
+        # Una sesión sin estos campos no es nuestra: puede venir de otra
+        # integración sobre la misma cuenta. Se ignora en lugar de fallar, para
+        # que Stripe no reintente para siempre algo que nunca vamos a procesar.
+        if not cliente or not creditos:
+            return None
+
         return PagoConfirmado(
             evento_id=evento["id"],
-            cliente=sesion["client_reference_id"],
-            creditos=int(sesion["metadata"]["creditos"]),
+            cliente=cliente,
+            creditos=int(creditos),
         )
