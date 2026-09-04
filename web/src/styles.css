@@ -1,1 +1,26 @@
-/* You can add global styles to this file, and also import other style files */
+/* Estilos globales: tipografía y fondo base. */
+
+:root {
+  --fondo: #f6f7f9;
+  --panel: #ffffff;
+  --borde: #dfe3e8;
+  --texto: #1c2430;
+  --tenue: #5b6672;
+  --acento: #1f6feb;
+  --exito-fondo: #e8f5ec;
+  --exito-borde: #b7dfc4;
+  --error-fondo: #fdecec;
+  --error-borde: #f5c2c2;
+  --error-texto: #9b1c1c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--texto);
+  background: var(--fondo);
+}

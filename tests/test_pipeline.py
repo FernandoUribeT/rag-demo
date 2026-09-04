@@ -99,3 +99,40 @@ def test_agregar_un_documento_vacio_no_altera_la_base(embedder):
     b = BaseDeConocimiento(embedder)
     assert b.agregar_documento("", "vacio") == []
     assert len(b) == 0
+
+
+# ── Regresión: abstención del modelo pese a superar el umbral ────────────────
+
+class ModeloQueSeAbstiene:
+    """Devuelve el texto de abstención aunque se le haya dado contexto.
+
+    Reproduce lo que ocurre con datos reales: un fragmento puede superar el
+    umbral de similitud y aun así no contener la respuesta. El modelo lo nota y
+    se niega; el sistema debe tratarlo como abstención, no como respuesta.
+    """
+
+    def complete(self, prompt: str) -> str:
+        return SIN_CONTEXTO
+
+
+def test_si_el_modelo_se_abstiene_no_se_reportan_fuentes(base):
+    """Devolverlas presentaria como respaldo unos fragmentos que no respaldan
+    nada, y la interfaz lo pintaria como si hubiera respondido."""
+    respuesta = responder(
+        "clave del catalogo para carta porte", base, ModeloQueSeAbstiene()
+    )
+
+    assert respuesta.texto == SIN_CONTEXTO
+    assert respuesta.fuentes == []
+    assert respuesta.abstuvo
+
+
+def test_una_abstencion_del_modelo_se_normaliza_al_mensaje_estandar(base):
+    """Aunque el modelo agregue texto alrededor, el resultado es el mensaje
+    unico: la interfaz no deberia tener que interpretar variantes."""
+
+    class ConRuido:
+        def complete(self, prompt: str) -> str:
+            return f"  {SIN_CONTEXTO}  \n"
+
+    assert responder("carta porte", base, ConRuido()).texto == SIN_CONTEXTO

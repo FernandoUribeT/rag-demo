@@ -12,6 +12,7 @@ esta clase es la única pieza que hay que cambiar.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import numpy as np
@@ -20,7 +21,12 @@ from .chunking import Fragmento
 
 # Por debajo de esto la coincidencia no es información, es ruido con forma de
 # resultado. Se prefiere no responder a responder con un fragmento irrelevante.
-SIMILITUD_MINIMA = 0.25
+#
+# El valor depende del modelo de embeddings y hay que medirlo, no suponerlo.
+# Con bge-m3, dos textos sin relación alguna todavía puntúan alrededor de 0.25
+# —"receta de pizza" contra un corpus fiscal daba 0.25 a 0.28—, mientras que una
+# coincidencia real ronda 0.5 o más. Un umbral de 0.25 dejaba pasar el ruido.
+SIMILITUD_MINIMA = float(os.getenv("SIMILITUD_MINIMA", "0.40"))
 
 
 @dataclass(frozen=True)

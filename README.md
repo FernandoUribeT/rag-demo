@@ -131,6 +131,19 @@ con lo mejor disponible es la causa más común de que un sistema RAG conteste
 con seguridad usando contexto irrelevante. Aquí, lo que no supera el umbral no
 entra.
 
+El valor del umbral hay que **medirlo, no suponerlo**. Con bge-m3, dos textos
+sin relación alguna todavía puntúan alrededor de 0.25: preguntar por una receta
+de cocina contra un corpus fiscal daba entre 0.25 y 0.28, mientras que una
+coincidencia real ronda 0.5 o más. Un umbral de 0.25 dejaba pasar el ruido
+entero, y solo se notó ejecutando la aplicación —las pruebas usan un embedder
+determinista con otra escala y seguían en verde.
+
+**Abstención en dos capas.** El umbral filtra la mayor parte del ruido, pero no
+todo: un fragmento puede superarlo y aun así no contener la respuesta. Cuando
+el modelo lo detecta y se niega, se descartan las fuentes. Devolverlas sería
+presentar como respaldo unos fragmentos que no respaldan nada, y la interfaz
+mostraría el resultado como si hubiera respondido.
+
 **No se invoca al modelo cuando se abstiene.** Además de ser lo correcto,
 ahorra la llamada más cara del flujo. Hay una prueba que usa un modelo que
 falla si alguien lo llama, para que esa garantía no se pierda en un refactor.

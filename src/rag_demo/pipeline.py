@@ -104,5 +104,16 @@ def responder(
     if not coincidencias:
         return Respuesta(texto=SIN_CONTEXTO, fuentes=[])
 
-    texto = modelo.complete(armar_prompt(pregunta, coincidencias))
-    return Respuesta(texto=texto.strip(), fuentes=coincidencias)
+    texto = modelo.complete(armar_prompt(pregunta, coincidencias)).strip()
+
+    # El umbral filtra la mayor parte del ruido, pero no todo: un fragmento
+    # puede superarlo y aun así no contener la respuesta. Cuando el modelo lo
+    # detecta y se abstiene, se descartan las fuentes.
+    #
+    # Devolverlas sería presentar como respaldo unos fragmentos que no
+    # respaldan nada, y la interfaz mostraría el resultado como si hubiera
+    # respondido. Abstenerse es un resultado distinto de responder.
+    if SIN_CONTEXTO in texto:
+        return Respuesta(texto=SIN_CONTEXTO, fuentes=[])
+
+    return Respuesta(texto=texto, fuentes=coincidencias)
