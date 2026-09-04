@@ -46,6 +46,8 @@ pregunta ──► vector ──► búsqueda por similitud ──► ¿supera e
 | `cache.py` | caché de vectores; decorador sobre cualquier `Embedder` |
 | `ingesta.py` | aceptar documento, encolar, procesar en el worker |
 | `storage.py` | almacén de objetos para el documento original |
+| `creditos.py` | saldo de créditos, otorgamiento idempotente |
+| `pagos.py` | frontera con Stripe: sesión de pago y verificación de webhook |
 | `contracts.py` | los protocolos que dependen de un modelo |
 | `api.py` | API HTTP con FastAPI: consultar y subir documentos |
 | `providers.py`, `cola_rabbitmq.py` | adaptadores: Ollama, RabbitMQ |
@@ -78,6 +80,34 @@ La clave de caché incluye el nombre del modelo. Omitirlo es el error clásico
 que, tras cambiar de modelo, sigue devolviendo vectores del anterior —
 incomparables con los nuevos, y sin ningún síntoma visible.
 
+## Cobro por créditos
+
+Indexar cuesta cómputo, así que se cobra por documento indexado. Tres reglas
+gobiernan esa parte, y las tres son de seguridad:
+
+**El precio lo pone el servidor.** El comprador elige una clave de paquete, no
+un monto. Si el navegador mandara el precio, cualquiera edita la petición y
+compra doscientos créditos por un centavo.
+
+**Los créditos se otorgan en el webhook, no en la página de éxito.** Esa URL la
+puede abrir cualquiera a mano sin haber pagado. El webhook lo manda Stripe
+cuando el cobro se confirmó.
+
+**Un webhook sin firma válida se rechaza.** El endpoint es público: cualquiera
+puede mandarle un POST diciendo "este cliente pagó". La firma es lo único que
+distingue a Stripe de un impostor. Se verifica sobre los bytes crudos del
+cuerpo, porque convertir a JSON y volver a serializar cambia el contenido y
+rompe la comprobación.
+
+Y una cuarta, de correctitud: **otorgar es idempotente.** Stripe reintenta un
+webhook hasta recibir 2xx y puede entregar el mismo evento más de una vez por
+diseño. Sin esa guarda, un reintento regala créditos: se paga una vez y se
+recibe dos. La clave de idempotencia es el id del evento.
+
+El cobro ocurre **antes** de encolar el documento. Al revés, un saldo
+insuficiente dejaría el trabajo en la cola y el worker indexaría algo que nadie
+pagó.
+
 ## Por qué está separado así
 
 **Solo dos operaciones necesitan un modelo:** convertir texto en vector, y
@@ -85,7 +115,7 @@ generar la respuesta. Están aisladas como protocolos en `contracts.py`.
 
 Todo lo demás —trocear, indexar, buscar, umbralizar, armar el prompt, decidir
 si abstenerse— es determinista y se prueba sin red, sin claves y sin servidor.
-Por eso las 77 pruebas corren en menos de un segundo y funcionan en CI.
+Por eso las 115 pruebas corren en menos de un segundo y funcionan en CI.
 
 Una suite que necesita un modelo real no corre en CI, y una suite que no corre
 en CI termina no corriendo nunca.
@@ -121,7 +151,7 @@ aquí agregaría dependencias y capas sin quitar trabajo.
 
 ```bash
 uv sync --dev
-uv run pytest                     # 77 pruebas, sin red ni servicios
+uv run pytest                     # 115 pruebas, sin red ni servicios
 ```
 
 Con todas las dependencias, en contenedores:

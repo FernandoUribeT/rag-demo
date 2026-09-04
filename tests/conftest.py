@@ -81,3 +81,73 @@ def embedder() -> EmbedderDeterminista:
 @pytest.fixture
 def modelo() -> ModeloQueRepiteElContexto:
     return ModeloQueRepiteElContexto()
+
+
+# ── Pasarela de pagos falsa ──────────────────────────────────────────────────
+
+import hashlib
+import hmac
+import json
+
+from rag_demo.pagos import (
+    FirmaInvalida,
+    PagoConfirmado,
+    SesionDePago,
+    creditos_de,
+    precio_de,
+)
+
+SECRETO_DE_PRUEBA = "whsec_prueba"
+
+
+class PasarelaFalsa:
+    """Reproduce el contrato de Stripe sin salir a la red.
+
+    Firma con HMAC-SHA256 igual que Stripe, para que la prueba de firma
+    inválida verifique el mecanismo real y no una comparación de cadenas.
+    """
+
+    def __init__(self) -> None:
+        self.ultimo_cobro: int | None = None
+
+    def firmar(self, evento: dict) -> tuple[bytes, str]:
+        cuerpo = json.dumps(evento).encode("utf-8")
+        firma = hmac.new(
+            SECRETO_DE_PRUEBA.encode(), cuerpo, hashlib.sha256
+        ).hexdigest()
+        return cuerpo, firma
+
+    def crear_sesion(self, paquete: str, cliente: str) -> SesionDePago:
+        creditos = creditos_de(paquete)      # valida contra el catálogo
+        self.ultimo_cobro = precio_de(paquete)
+        return SesionDePago(
+            id=f"cs_test_{cliente}_{creditos}", url="https://checkout.stripe.test/x"
+        )
+
+    def leer_evento(self, cuerpo: bytes, firma: str) -> PagoConfirmado | None:
+        esperada = hmac.new(
+            SECRETO_DE_PRUEBA.encode(), cuerpo, hashlib.sha256
+        ).hexdigest()
+        # compare_digest y no ==: evita filtrar información por tiempo de
+        # comparación, que es como se ataca una verificación de firma.
+        if not hmac.compare_digest(esperada, firma):
+            raise FirmaInvalida("la firma no corresponde al cuerpo")
+
+        evento = json.loads(cuerpo)
+        if evento.get("type") != "checkout.session.completed":
+            return None
+
+        sesion = evento["data"]["object"]
+        if sesion.get("payment_status") != "paid":
+            return None
+
+        return PagoConfirmado(
+            evento_id=evento["id"],
+            cliente=sesion["client_reference_id"],
+            creditos=int(sesion["metadata"]["creditos"]),
+        )
+
+
+@pytest.fixture
+def pasarela() -> PasarelaFalsa:
+    return PasarelaFalsa()

@@ -17,6 +17,7 @@ servicios = [
     "redis>=5.0",
     "pika>=1.3",
     "minio>=7.2",
+    "stripe>=11.0",
 ]
 
 [project.scripts]
